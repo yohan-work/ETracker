@@ -72,20 +72,41 @@ def draw_emotion_map(records, period='all'):
     colors = [r["color"] for r in filtered_records]
     emotions = [r["emotion"] for r in filtered_records]
     notes = [r["note"] for r in filtered_records]
+    
+    # 날씨 정보 추출
+    weathers = []
+    temps = []
+    for r in filtered_records:
+        if "weather" in r and r["weather"]:
+            weathers.append(r["weather"].get("emoji", ""))
+            temps.append(r["weather"].get("temp", ""))
+        else:
+            weathers.append("")
+            temps.append("")
 
     # 정렬
-    sorted_data = sorted(zip(dates, colors, emotions, notes), key=lambda x: x[0])
-    dates, colors, emotions, notes = zip(*sorted_data)
+    sorted_data = sorted(zip(dates, colors, emotions, notes, weathers, temps), key=lambda x: x[0])
+    dates, colors, emotions, notes, weathers, temps = zip(*sorted_data)
 
-    fig, ax = plt.subplots(figsize=(max(8, len(dates)*0.5), 3))
+    # 두 개의 서브플롯 생성 (감정 타임라인 + 온도 그래프)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(max(10, len(dates)*0.5), 5), 
+                                  gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
 
-    # 타임라인 그리기
-    for i, (date, color, note) in enumerate(zip(dates, colors, notes)):
+    # 감정 타임라인 그리기 (위쪽 서브플롯)
+    for i, (date, color, note, weather) in enumerate(zip(dates, colors, notes, weathers)):
         rect = plt.Rectangle((i, 0), 0.8, 1, color=color)
-        ax.add_patch(rect)
+        ax1.add_patch(rect)
+        
+        # 날씨 이모지가 있으면 표시
+        if weather:
+            ax1.text(i+0.4, 1.1, weather, fontsize=12, ha='center')
         
         # 이벤트에 마우스 호버시 툴팁으로 노트 표시
-        ax.annotate(f"{date.strftime('%Y-%m-%d')}\n{note}", 
+        tooltip_text = f"{date.strftime('%Y-%m-%d')}\n{note}"
+        if weather:
+            tooltip_text += f"\n{weather} {temps[i]}°C"
+            
+        ax1.annotate(tooltip_text, 
                     (i+0.4, 0.5),
                     xytext=(15, 15),
                     textcoords="offset points",
@@ -95,24 +116,59 @@ def draw_emotion_map(records, period='all'):
     
     # 마우스 호버 이벤트 처리
     def hover(event):
-        for i, rect in enumerate(ax.patches):
+        for i, rect in enumerate(ax1.patches):
             contains, _ = rect.contains(event)
-            annotations = ax.texts[i:i+1]  # 해당 사각형과 연관된 주석
+            annotations = ax1.texts[i:i+len(dates)]  # 해당 사각형과 연관된 주석
             if contains and annotations:
-                for ann in annotations:
+                for ann in annotations[i:i+1]:
+                    if not isinstance(ann, plt.Text) or not hasattr(ann, 'get_visible'):
+                        continue
                     ann.set_visible(True)
             elif annotations:
-                for ann in annotations:
+                for ann in annotations[i:i+1]:
+                    if not isinstance(ann, plt.Text) or not hasattr(ann, 'get_visible'):
+                        continue
                     ann.set_visible(False)
         fig.canvas.draw_idle()
     
     fig.canvas.mpl_connect("motion_notify_event", hover)
 
-    ax.set_xlim(0, len(dates))
-    ax.set_ylim(0, 1)
-    ax.set_xticks(np.arange(len(dates)) + 0.4)
-    ax.set_xticklabels([d.strftime("%m/%d") for d in dates], rotation=45)
-    ax.set_yticks([])
+    # 온도 그래프 그리기 (아래쪽 서브플롯)
+    if any(temps) and all(t != "" for t in temps):
+        # 온도 데이터가 있으면 그래프 그리기
+        temp_values = [float(t) for t in temps if t]
+        if temp_values:
+            x_values = [i+0.4 for i in range(len(dates)) if temps[i]]
+            if x_values and temp_values:
+                # 막대 그래프
+                ax2.bar(x_values, temp_values, width=0.6, color='skyblue', alpha=0.7)
+                
+                # 온도 값 텍스트로 표시
+                for x, temp in zip(x_values, temp_values):
+                    ax2.text(x, temp+0.5, f"{temp}°C", ha='center', va='bottom', fontsize=8)
+                
+                ax2.set_ylabel('온도 (°C)')
+                
+                # Y축 범위 설정
+                if temp_values:
+                    min_temp = min(temp_values) - 3
+                    max_temp = max(temp_values) + 3
+                    ax2.set_ylim(min_temp, max_temp)
+    else:
+        # 온도 데이터가 없으면 숨기기
+        ax2.set_visible(False)
+        fig.set_size_inches(max(10, len(dates)*0.5), 3)
+
+    # 감정 타임라인 설정
+    ax1.set_xlim(0, len(dates))
+    ax1.set_ylim(0, 1.3)  # 날씨 이모지 공간 확보
+    ax1.set_xticks(np.arange(len(dates)) + 0.4)
+    ax1.set_xticklabels([d.strftime("%m/%d") for d in dates], rotation=45)
+    ax1.set_yticks([])
+    
+    # 온도 그래프 설정
+    ax2.set_xticks(np.arange(len(dates)) + 0.4)
+    ax2.set_xticklabels([d.strftime("%m/%d") for d in dates], rotation=45)
 
     # 범례 생성 (중복 제거)
     unique_emotions = []
@@ -121,9 +177,9 @@ def draw_emotion_map(records, period='all'):
             unique_emotions.append((emotion, color))
     
     legend = [mpatches.Patch(color=color, label=emotion) for emotion, color in unique_emotions]
-    ax.legend(handles=legend, bbox_to_anchor=(1.01, 1), loc="upper left")
+    ax1.legend(handles=legend, bbox_to_anchor=(1.01, 1), loc="upper left")
 
-    plt.title(f"감정 지도{title_suffix}")
+    ax1.set_title(f"감정 지도{title_suffix}")
     plt.tight_layout()
     plt.show()
 
@@ -148,10 +204,19 @@ def draw_monthly_calendar(year=None, month=None):
     # 월간 달력 생성
     cal = calendar.monthcalendar(year, month)
     
-    # 날짜별 감정 색상 매핑
+    # 날짜별 정보 매핑
     date_to_color = {r["date"]: r["color"] for r in monthly_records}
     date_to_emotion = {r["date"]: r["emotion"] for r in monthly_records}
     date_to_note = {r["date"]: r["note"] for r in monthly_records}
+    date_to_weather = {}
+    
+    # 날씨 정보가 있으면 추가
+    for r in monthly_records:
+        if "weather" in r and r["weather"]:
+            emoji = r["weather"].get("emoji", "")
+            temp = r["weather"].get("temp", "")
+            if emoji and temp:
+                date_to_weather[r["date"]] = f"{emoji} {temp}°C"
     
     # 그림 설정
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -186,6 +251,10 @@ def draw_monthly_calendar(year=None, month=None):
                 cell_color = date_to_color[date_str]
                 cell_text = f"{day}\n{date_to_emotion[date_str]}"
                 
+                # 날씨 정보가 있으면 추가
+                if date_str in date_to_weather:
+                    cell_text += f"\n{date_to_weather[date_str]}"
+                
                 # 셀에 툴팁으로 노트 추가
                 cell = the_table[i+1, j]  # 요일 헤더가 있어서 i+1
                 cell.get_text().set_text(cell_text)
@@ -193,7 +262,11 @@ def draw_monthly_calendar(year=None, month=None):
                 
                 # 노트 정보를 위한 툴팁
                 note = date_to_note[date_str]
-                ax.annotate(f"{date_str}\n{note}",
+                tooltip_text = f"{date_str}\n{note}"
+                if date_str in date_to_weather:
+                    tooltip_text += f"\n{date_to_weather[date_str]}"
+                
+                ax.annotate(tooltip_text,
                            xy=(cell.get_x()+cell.get_width()/2, 
                                cell.get_y()+cell.get_height()/2),
                            xytext=(20, 20),
@@ -272,6 +345,103 @@ def draw_emotion_distribution():
     plt.tight_layout()
     plt.show()
 
+def analyze_weather_emotion():
+    """날씨와 감정의 상관관계 분석"""
+    records = load_records()
+    weather_records = [r for r in records if "weather" in r and r["weather"]]
+    
+    if not weather_records or len(weather_records) < 3:
+        print("날씨 정보가 충분하지 않습니다. (최소 3개 이상 필요)")
+        return
+    
+    # 날씨별 감정 집계
+    weather_emotion_map = {}
+    
+    for record in weather_records:
+        weather_main = record["weather"].get("weather", "Unknown")
+        temp = record["weather"].get("temp", 0)
+        emotion = record["emotion"]
+        
+        # 온도 구간 (5도 단위)
+        temp_range = f"{5 * (temp // 5)}-{5 * (temp // 5) + 5}"
+        
+        # 날씨별 집계
+        if weather_main not in weather_emotion_map:
+            weather_emotion_map[weather_main] = {}
+        
+        if emotion not in weather_emotion_map[weather_main]:
+            weather_emotion_map[weather_main][emotion] = 0
+        
+        weather_emotion_map[weather_main][emotion] += 1
+        
+        # 온도별 집계
+        key = f"온도 {temp_range}°C"
+        if key not in weather_emotion_map:
+            weather_emotion_map[key] = {}
+        
+        if emotion not in weather_emotion_map[key]:
+            weather_emotion_map[key][emotion] = 0
+        
+        weather_emotion_map[key][emotion] += 1
+    
+    # 그래프 생성
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10))
+    
+    # 1. 날씨별 감정 분포
+    weather_types = [w for w in weather_emotion_map.keys() if not w.startswith("온도")]
+    x_pos = np.arange(len(weather_types))
+    
+    width = 0.8 / len(set(emotion for record in weather_records for emotion in [record["emotion"]]))
+    
+    # 모든 감정 목록
+    all_emotions = sorted(set(record["emotion"] for record in weather_records))
+    
+    # 감정 맵 로드해서 색상 가져오기
+    emotion_map = load_emotion_map()
+    
+    # 각 감정별 막대 그래프 그리기
+    for i, emotion in enumerate(all_emotions):
+        heights = []
+        for weather in weather_types:
+            count = weather_emotion_map[weather].get(emotion, 0)
+            heights.append(count)
+        
+        axs[0].bar(x_pos + i * width - width * len(all_emotions) / 2, 
+                  heights, 
+                  width=width, 
+                  label=emotion,
+                  color=emotion_map.get(emotion, "#CCCCCC"))
+    
+    axs[0].set_title('날씨별 감정 분포')
+    axs[0].set_xticks(x_pos)
+    axs[0].set_xticklabels(weather_types)
+    axs[0].legend()
+    
+    # 2. 온도별 감정 분포
+    temp_ranges = sorted([w for w in weather_emotion_map.keys() if w.startswith("온도")])
+    x_pos = np.arange(len(temp_ranges))
+    
+    # 각 감정별 막대 그래프 그리기
+    for i, emotion in enumerate(all_emotions):
+        heights = []
+        for temp_range in temp_ranges:
+            count = weather_emotion_map[temp_range].get(emotion, 0)
+            heights.append(count)
+        
+        axs[1].bar(x_pos + i * width - width * len(all_emotions) / 2, 
+                  heights, 
+                  width=width, 
+                  label=emotion,
+                  color=emotion_map.get(emotion, "#CCCCCC"))
+    
+    axs[1].set_title('온도별 감정 분포')
+    axs[1].set_xticks(x_pos)
+    axs[1].set_xticklabels(temp_ranges)
+    axs[1].legend()
+    
+    plt.tight_layout()
+    plt.show()
+
 def show_menu():
     print("\n===== 감정 시각화 메뉴 =====")
     print("1. 전체 기간 감정 지도")
@@ -279,7 +449,8 @@ def show_menu():
     print("3. 이번 주 감정 지도")
     print("4. 월간 감정 캘린더")
     print("5. 감정 분포 통계")
-    print("6. 돌아가기")
+    print("6. 날씨-감정 상관관계 분석")
+    print("7. 돌아가기")
     
     choice = input("\n선택: ").strip()
     
@@ -317,6 +488,8 @@ def show_menu():
     elif choice == "5":
         draw_emotion_distribution()
     elif choice == "6":
+        analyze_weather_emotion()
+    elif choice == "7":
         return
     else:
         print("잘못된 선택입니다. 다시 선택해주세요.")
