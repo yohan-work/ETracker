@@ -1,4 +1,4 @@
-# 마음기록기 (감정 지도)
+# ETracker
 
 <img width="875" alt="image" src="https://github.com/user-attachments/assets/
 cc6211c1-eaff-4c40-aab8-7c1b324af04b" />
@@ -9,7 +9,7 @@ cc6211c1-eaff-4c40-aab8-7c1b324af04b" />
 - 감정에 색상을 할당하여 직관적인 시각화
 - 일/주/월 단위로 감정의 흐름 시각화
 - 감정 분포 통계 제공
-- **날씨 정보 통합**: 감정과 날씨의 연관성 분석
+- 날씨 정보 통합: 감정과 날씨의 연관성 분석
 
 ## 설치 및 실행
 
@@ -107,6 +107,5 @@ python visualize.py
 - 기본 도시 변경: `get_weather(city="Seoul")`
 - 온도 단위 변경: `"units": "imperial"`로 변경하면 화씨 단위 사용
 
-## 라이선스
-
-이 프로젝트는 오픈 소스로 자유롭게 사용하실 수 있습니다.
+## License
+Yohan Choi
