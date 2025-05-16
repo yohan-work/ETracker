@@ -1,6 +1,8 @@
-# 마음기록기 (감정 지도)
+# Emotion MAP
 
-감정 기록 및 시각화
+감정 기록 및 시각화 용도
+<img width="875" alt="image" src="https://github.com/user-attachments/assets/cc6211c1-eaff-4c40-aab8-7c1b324af04b" />
+
 
 ## 기능
 
