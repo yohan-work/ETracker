@@ -1,7 +1,6 @@
 # ETracker
+<img width="872" alt="image" src="https://github.com/user-attachments/assets/cf2701be-12bf-4061-81e9-8a1046110f07" />
 
-<img width="875" alt="image" src="https://github.com/user-attachments/assets/
-cc6211c1-eaff-4c40-aab8-7c1b324af04b" />
 
 ## 기능
 
